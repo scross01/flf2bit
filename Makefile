@@ -31,4 +31,8 @@ clean:
 	rm -r fonts/*.bit
 	rm flf2bit
 
-.PHONY: convert install c64fonts
+fmt:
+	go fmt
+	mdformat --wrap 80 README.md
+
+.PHONY: convert install c64fonts fmt
