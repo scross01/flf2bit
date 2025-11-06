@@ -11,10 +11,10 @@ JSON-based (.bit) used by ansifont and
 can be used with the `bit` terminal font renderer. This allows you to convert
 some FIGlet bitmap style fonts for use the with bit.
 
-The initial version of this tool has been tested with the figlet C64-Fonts. More
-fonts may work, but most FIGlet fonts use features not supported by `bit`, so
-results may vary. Additional details on creating the C64-Fonts can be found
-bellow.
+The initial version of this tool has been tested with the figlet C64-Fonts and
+bdffonts. More fonts may work, but most FIGlet fonts use features not supported
+by `bit`, so results may vary. Additional details on creating the C64 fonts and
+BDF fonts can be found below.
 
 ## Installation
 
@@ -77,22 +77,24 @@ cp <path_to>/example.bit fonts/
 go build -o bit ./cmd/bit
 ```
 
-## Creating C64-Fonts
+## Creating C64 and BDF Fonts
 
-The included `Makefile` demonstrates how to convert the C64-fonts from the
-figlet-fonts repository to .bit format using `flf2bit`.
+The included `Makefile` demonstrates how to convert the C64-font and bdffonts
+from the figlet-fonts repository to .bit format using `flf2bit`.
 
 This will download the figlet-fonts repository and the bit repository, convert
-the C64-Fonts, and place them in the `bit/ansifont/fonts` directory, and rebuilt
-bit with the new fonts.
+the C64-Fonts and bdffonts, and place them in the `bit/ansifont/fonts`
+directory, and rebuilt bit with the new fonts.
 
 ```bash
+make c64fonts
+make bdffonts
 make install
 ```
 
-Note that the Figlet C64-Fonts where original extracted from Commodore 64
-character set file and converted using Commodore2Figlet v1.00 by David Proper.
-Some charactors are different in the original
+Note that the Figlet C64-Fonts provided by Figlet where originally extracted
+from Commodore 64 character set file and converted using Commodore2Figlet v1.00
+by David Proper. Some characters are different in the original
 [PETSCII](https://en.wikipedia.org/wiki/PETSCII) than in ASCII, certain
 charactors will be different or missing. Not all fonts include both upper and
 lower case letters, and some fonts transpose the the case.
