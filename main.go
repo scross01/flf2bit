@@ -16,6 +16,13 @@ type FontData struct {
 	Characters map[string][]string `json:"characters"`
 }
 
+// processCharacterLine processes a character line by replacing # with █ and removing $ delimiters
+func processCharacterLine(line string) string {
+	processedLine := strings.ReplaceAll(line, "#", "█")
+	processedLine = strings.ReplaceAll(processedLine, "$", " ")
+	return processedLine
+}
+
 func main() {
 	if len(os.Args) < 3 {
 		fmt.Println("Usage: flf2bit [options] <input.flf> <output.bit>")
@@ -179,8 +186,7 @@ func convertFLFToBit(inputFile string, name string, author string, license strin
 					cleanPart := strings.TrimRight(part, "$")
 					// DO NOT filter out empty parts - all lines should be preserved in character definitions
 					// Replace # with █ and remove $ end-of-line delimiters
-					processedPart := strings.ReplaceAll(cleanPart, "#", "█")
-					processedPart = strings.ReplaceAll(processedPart, "$", "")
+					processedPart := processCharacterLine(cleanPart)
 					currentCharLines = append(currentCharLines, processedPart)
 				}
 			}
@@ -190,9 +196,7 @@ func convertFLFToBit(inputFile string, name string, author string, license strin
 				// Process each line to replace # with █ and remove $ delimiters
 				processedLines := make([]string, len(currentCharLines))
 				for i, line := range currentCharLines {
-					processedLine := strings.ReplaceAll(line, "#", "█")
-					processedLine = strings.ReplaceAll(processedLine, "$", "")
-					processedLines[i] = processedLine
+					processedLines[i] = processCharacterLine(line)
 				}
 
 				// Calculate the ASCII value for this character position
@@ -215,8 +219,7 @@ func convertFLFToBit(inputFile string, name string, author string, license strin
 					cleanPart := strings.TrimRight(part, "$")
 					// DO NOT filter out empty parts - all lines should be preserved in character definitions
 					// Replace # with █ and remove $ end-of-line delimiters
-					processedPart := strings.ReplaceAll(cleanPart, "#", "█")
-					processedPart = strings.ReplaceAll(processedPart, "$", "")
+					processedPart := processCharacterLine(cleanPart)
 					currentCharLines = append(currentCharLines, processedPart)
 					inCharacter = true
 				}
@@ -230,8 +233,7 @@ func convertFLFToBit(inputFile string, name string, author string, license strin
 				cleanPart := strings.TrimRight(parts[i], "$")
 				// DO NOT filter out empty parts - all lines should be preserved in character definitions
 				// Replace # with █ and remove $ end-of-line delimiters
-				processedPart := strings.ReplaceAll(cleanPart, "#", "█")
-				processedPart = strings.ReplaceAll(processedPart, "$", "")
+				processedPart := processCharacterLine(cleanPart)
 				currentCharLines = append(currentCharLines, processedPart)
 			}
 			inCharacter = true
@@ -241,9 +243,7 @@ func convertFLFToBit(inputFile string, name string, author string, license strin
 				// Process each line to replace # with █ and remove $ delimiters
 				processedLines := make([]string, len(currentCharLines))
 				for i, line := range currentCharLines {
-					processedLine := strings.ReplaceAll(line, "#", "█")
-					processedLine = strings.ReplaceAll(processedLine, "$", "")
-					processedLines[i] = processedLine
+					processedLines[i] = processCharacterLine(line)
 				}
 
 				// Calculate the ASCII value for this character position
@@ -267,9 +267,7 @@ func convertFLFToBit(inputFile string, name string, author string, license strin
 				// Process each line to replace # with █ and remove $ delimiters
 				processedLines := make([]string, len(currentCharLines))
 				for i, line := range currentCharLines {
-					processedLine := strings.ReplaceAll(line, "#", "█")
-					processedLine = strings.ReplaceAll(processedLine, "$", "")
-					processedLines[i] = processedLine
+					processedLines[i] = processCharacterLine(line)
 				}
 
 				// Calculate the ASCII value for this character position
