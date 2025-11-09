@@ -115,21 +115,26 @@ func convertFLFToBit(inputFile string, name string, author string, license strin
 		return nil, fmt.Errorf("invalid FLF header format")
 	}
 
-	// Extract the hardblank character from the 6th position of the header
+	// Extract the hardblank character from the 6th character of the header
 	var hardblankChar string = "$"
 	if len(header) >= 6 {
 		hardblankChar = string(header[5]) // 6th character is the hardblank
 	}
 
-	// Skip comment lines until we reach actual character data
+	// Extract comment line count from the header (6th field in the space-separated parts)
+	commentLineCount := 0
+	if len(parts) >= 6 {
+		// The 6th field contains the comment line count
+		fmt.Sscanf(parts[5], "%d", &commentLineCount)
+	}
+
+	// Skip the exact number of comment lines specified in the header
 	commentLines := []string{}
-	for scanner.Scan() {
-		line := scanner.Text()
-		// Character data lines contain @ symbols, comment lines typically don't
-		if strings.Contains(line, "@") {
-			// Found the first character line, we'll process it below
-			break
+	for i := 0; i < commentLineCount; i++ {
+		if !scanner.Scan() {
+			return nil, fmt.Errorf("unexpected end of file while reading comment lines")
 		}
+		line := scanner.Text()
 		commentLines = append(commentLines, line)
 	}
 
@@ -164,12 +169,38 @@ func convertFLFToBit(inputFile string, name string, author string, license strin
 		fontLicense = "Converted font, check original license"
 	}
 
+	// First, find the line end character by looking at the first non-comment line
+	var lineEndChar string = "@"
+	var firstDataLine string = ""
+	
+	// Read the first line after comments to determine the line end character
+	if scanner.Scan() {
+		firstDataLine = scanner.Text()
+		
+		// If it's an empty line, continue reading until we find a non-empty line
+		for firstDataLine == "" && scanner.Scan() {
+			firstDataLine = scanner.Text()
+		}
+		
+		// Determine the line end character from the last character of the first non-comment line
+		if len(firstDataLine) > 0 {
+			// Trim right whitespace to get the actual last character
+			trimmedLine := strings.TrimRight(firstDataLine, " \t\r\n")
+			if len(trimmedLine) > 0 {
+				lineEndChar = string(trimmedLine[len(trimmedLine)-1])
+			}
+		}
+	}
+	
+	// Create the end-of-character delimiter (two of the line end characters)
+	endOfCharDelimiter := lineEndChar + lineEndChar
+
 	// Process characters
 	characters := make(map[string][]string)
 
-	// Go back to the line that started character data
-	// (which was read by the break in the comment loop)
-	currentLine := scanner.Text()
+	// Process the first character line
+	// currentLine is firstDataLine
+	currentLine := firstDataLine
 
 	// Process characters until EOF
 	// Count all characters in file order, then map to appropriate ASCII codes
@@ -181,18 +212,15 @@ func convertFLFToBit(inputFile string, name string, author string, license strin
 	for {
 		line := currentLine
 
-		// If line contains "@@", it's the end of a character
-		if strings.Contains(line, "@@") {
-			parts := strings.Split(line, "@@")
+		// If line contains the end-of-character delimiter, it's the end of a character
+		if strings.Contains(line, endOfCharDelimiter) {
+			parts := strings.Split(line, endOfCharDelimiter)
 
 			// Process the first part (end of current character)
 			if parts[0] != "" {
-				charParts := strings.Split(parts[0], "@")
+				charParts := strings.Split(parts[0], lineEndChar)
 				for _, part := range charParts {
-					cleanPart := strings.TrimRight(part, "$")
-					// DO NOT filter out empty parts - all lines should be preserved in character definitions
-					// Replace hardblank with space and # with █
-					processedPart := processCharacterLine(cleanPart, hardblankChar)
+					processedPart := processCharacterLine(part, hardblankChar)
 					currentCharLines = append(currentCharLines, processedPart)
 				}
 			}
@@ -220,33 +248,26 @@ func convertFLFToBit(inputFile string, name string, author string, license strin
 
 			// Process the second part if it exists (start of next character)
 			if len(parts) > 1 && parts[1] != "" {
-				nextParts := strings.Split(parts[1], "@")
+				nextParts := strings.Split(parts[1], lineEndChar)
 				for _, part := range nextParts {
-					cleanPart := strings.TrimRight(part, "$")
-					// DO NOT filter out empty parts - all lines should be preserved in character definitions
-					// Replace hardblank with space and # with █
-					processedPart := processCharacterLine(cleanPart, hardblankChar)
+					processedPart := processCharacterLine(part, hardblankChar)
 					currentCharLines = append(currentCharLines, processedPart)
 					inCharacter = true
 				}
 			}
-		} else if strings.HasSuffix(line, "@") {
+		} else if strings.HasSuffix(line, lineEndChar) {
 			// This is a line of the current character
-			// Split by @ to get the actual character data
-			parts := strings.Split(line, "@")
+			// Split by the line end character to get the actual character data
+			parts := strings.Split(line, lineEndChar)
 			// The last element after splitting is usually empty, so we process all but the last
 			for i := 0; i < len(parts)-1; i++ {
-				cleanPart := strings.TrimRight(parts[i], "$")
-				// DO NOT filter out empty parts - all lines should be preserved in character definitions
-				// Replace hardblank with space and # with █
-				processedPart := processCharacterLine(cleanPart, hardblankChar)
+				processedPart := processCharacterLine(parts[i], hardblankChar)
 				currentCharLines = append(currentCharLines, processedPart)
 			}
 			inCharacter = true
 		} else if line == "" {
 			// Empty line after character data may indicate end of character
 			if inCharacter && len(currentCharLines) > 0 {
-				// Process each line to replace hardblank with space and # with █
 				processedLines := make([]string, len(currentCharLines))
 				for i, line := range currentCharLines {
 					processedLines[i] = processCharacterLine(line, hardblankChar)
