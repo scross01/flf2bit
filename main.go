@@ -177,12 +177,11 @@ func convertFLFToBit(inputFile string, name string, author string, license strin
 				charParts := strings.Split(parts[0], "@")
 				for _, part := range charParts {
 					cleanPart := strings.TrimRight(part, "$")
-					if cleanPart != "" {
-						// Replace # with █ and remove $ end-of-line delimiters
-						processedPart := strings.ReplaceAll(cleanPart, "#", "█")
-						processedPart = strings.ReplaceAll(processedPart, "$", "")
-						currentCharLines = append(currentCharLines, processedPart)
-					}
+					// DO NOT filter out empty parts - all lines should be preserved in character definitions
+					// Replace # with █ and remove $ end-of-line delimiters
+					processedPart := strings.ReplaceAll(cleanPart, "#", "█")
+					processedPart = strings.ReplaceAll(processedPart, "$", "")
+					currentCharLines = append(currentCharLines, processedPart)
 				}
 			}
 
@@ -214,28 +213,26 @@ func convertFLFToBit(inputFile string, name string, author string, license strin
 				nextParts := strings.Split(parts[1], "@")
 				for _, part := range nextParts {
 					cleanPart := strings.TrimRight(part, "$")
-					if cleanPart != "" {
-						// Replace # with █ and remove $ delimiters
-						processedPart := strings.ReplaceAll(cleanPart, "#", "█")
-						processedPart = strings.ReplaceAll(processedPart, "$", "")
-						currentCharLines = append(currentCharLines, processedPart)
-						inCharacter = true
-					}
+					// DO NOT filter out empty parts - all lines should be preserved in character definitions
+					// Replace # with █ and remove $ end-of-line delimiters
+					processedPart := strings.ReplaceAll(cleanPart, "#", "█")
+					processedPart = strings.ReplaceAll(processedPart, "$", "")
+					currentCharLines = append(currentCharLines, processedPart)
+					inCharacter = true
 				}
 			}
 		} else if strings.HasSuffix(line, "@") {
 			// This is a line of the current character
 			// Split by @ to get the actual character data
 			parts := strings.Split(line, "@")
-			// The last element after splitting is usually empty, so we ignore it
+			// The last element after splitting is usually empty, so we process all but the last
 			for i := 0; i < len(parts)-1; i++ {
 				cleanPart := strings.TrimRight(parts[i], "$")
-				if cleanPart != "" {
-					// Replace # with █ and remove $ delimiters
-					processedPart := strings.ReplaceAll(cleanPart, "#", "█")
-					processedPart = strings.ReplaceAll(processedPart, "$", "")
-					currentCharLines = append(currentCharLines, processedPart)
-				}
+				// DO NOT filter out empty parts - all lines should be preserved in character definitions
+				// Replace # with █ and remove $ end-of-line delimiters
+				processedPart := strings.ReplaceAll(cleanPart, "#", "█")
+				processedPart = strings.ReplaceAll(processedPart, "$", "")
+				currentCharLines = append(currentCharLines, processedPart)
 			}
 			inCharacter = true
 		} else if line == "" {
