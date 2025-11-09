@@ -16,10 +16,22 @@ type FontData struct {
 	Characters map[string][]string `json:"characters"`
 }
 
-// processCharacterLine processes a character line by replacing the hardblank character with space and # with █
-func processCharacterLine(line string, hardblankChar string) string {
+// CharacterMap represents a mapping from one character to another
+type CharacterMap map[rune]rune
+
+// processCharacterLine processes a character line by replacing the hardblank character with space and applying character mappings
+func processCharacterLine(line string, hardblankChar string, charMap CharacterMap) string {
 	processedLine := strings.ReplaceAll(line, hardblankChar, " ")  // Replace hardblank with space
-	processedLine = strings.ReplaceAll(processedLine, "#", "█")    // Replace # with █
+	
+	// Apply character mappings
+	runes := []rune(processedLine)
+	for i, r := range runes {
+		if replacement, exists := charMap[r]; exists {
+			runes[i] = replacement
+		}
+	}
+	processedLine = string(runes)
+	
 	return processedLine
 }
 
@@ -30,7 +42,8 @@ func main() {
 		fmt.Println("  --name <name>     Set the font name (default: extracted from FLF)")
 		fmt.Println("  --author <author> Set the author (default: extracted from FLF)")
 		fmt.Println("  --license <license> Set the license (default: 'Converted font, check original license')")
-		fmt.Println("Example: flf2bit -name \"Custom Font\" -author \"John Doe\" example.flf example.bit")
+		fmt.Println("  --map-chars <chars> Map first character to second character (can be used multiple times)")
+		fmt.Println("Example: flf2bit --name \"Custom Font\" --author \"John Doe\" --map-chars \"#█\" example.flf example.bit")
 		os.Exit(1)
 	}
 
@@ -38,6 +51,7 @@ func main() {
 	name := ""
 	author := ""
 	license := ""
+	charMaps := []string{} // Store character mapping pairs
 	args := os.Args[1:]
 	var inputFile, outputFile string
 
@@ -67,6 +81,14 @@ func main() {
 				fmt.Println("Error: --license requires a value")
 				os.Exit(1)
 			}
+		} else if arg == "--map-chars" {
+			if i+1 < len(args) {
+				charMaps = append(charMaps, args[i+1])
+				i++ // Skip next argument since it's the value
+			} else {
+				fmt.Println("Error: --map-chars requires a value")
+				os.Exit(1)
+			}
 		} else if inputFile == "" {
 			inputFile = arg
 		} else if outputFile == "" {
@@ -80,7 +102,21 @@ func main() {
 		os.Exit(1)
 	}
 
-	font, err := convertFLFToBit(inputFile, name, author, license)
+	// Process character maps
+	charMap := make(CharacterMap)
+	for _, mapStr := range charMaps {
+		if len(mapStr) >= 2 {
+			// Convert string to runes to properly handle multi-byte UTF-8 characters
+			runes := []rune(mapStr)
+			if len(runes) >= 2 {
+				fromChar := runes[0]  // First rune (character)
+				toChar := runes[1]    // Second rune (character)
+				charMap[fromChar] = toChar
+			}
+		}
+	}
+
+	font, err := convertFLFToBit(inputFile, name, author, license, charMap)
 	if err != nil {
 		fmt.Printf("Error converting font: %v\n", err)
 		os.Exit(1)
@@ -95,7 +131,7 @@ func main() {
 	fmt.Printf("Successfully converted %s to %s\n", inputFile, outputFile)
 }
 
-func convertFLFToBit(inputFile string, name string, author string, license string) (*FontData, error) {
+func convertFLFToBit(inputFile string, name string, author string, license string, charMap CharacterMap) (*FontData, error) {
 	file, err := os.Open(inputFile)
 	if err != nil {
 		return nil, err
@@ -220,17 +256,17 @@ func convertFLFToBit(inputFile string, name string, author string, license strin
 			if parts[0] != "" {
 				charParts := strings.Split(parts[0], lineEndChar)
 				for _, part := range charParts {
-					processedPart := processCharacterLine(part, hardblankChar)
+					processedPart := processCharacterLine(part, hardblankChar, charMap)
 					currentCharLines = append(currentCharLines, processedPart)
 				}
 			}
 
 			// Add completed character
 			if len(currentCharLines) > 0 {
-				// Process each line to replace hardblank with space and # with █
+				// Process each line to replace hardblank with space and apply character mappings
 				processedLines := make([]string, len(currentCharLines))
 				for i, line := range currentCharLines {
-					processedLines[i] = processCharacterLine(line, hardblankChar)
+					processedLines[i] = processCharacterLine(line, hardblankChar, charMap)
 				}
 
 				// Calculate the ASCII value for this character position
@@ -250,7 +286,7 @@ func convertFLFToBit(inputFile string, name string, author string, license strin
 			if len(parts) > 1 && parts[1] != "" {
 				nextParts := strings.Split(parts[1], lineEndChar)
 				for _, part := range nextParts {
-					processedPart := processCharacterLine(part, hardblankChar)
+					processedPart := processCharacterLine(part, hardblankChar, charMap)
 					currentCharLines = append(currentCharLines, processedPart)
 					inCharacter = true
 				}
@@ -261,7 +297,7 @@ func convertFLFToBit(inputFile string, name string, author string, license strin
 			parts := strings.Split(line, lineEndChar)
 			// The last element after splitting is usually empty, so we process all but the last
 			for i := 0; i < len(parts)-1; i++ {
-				processedPart := processCharacterLine(parts[i], hardblankChar)
+				processedPart := processCharacterLine(parts[i], hardblankChar, charMap)
 				currentCharLines = append(currentCharLines, processedPart)
 			}
 			inCharacter = true
@@ -270,7 +306,7 @@ func convertFLFToBit(inputFile string, name string, author string, license strin
 			if inCharacter && len(currentCharLines) > 0 {
 				processedLines := make([]string, len(currentCharLines))
 				for i, line := range currentCharLines {
-					processedLines[i] = processCharacterLine(line, hardblankChar)
+					processedLines[i] = processCharacterLine(line, hardblankChar, charMap)
 				}
 
 				// Calculate the ASCII value for this character position
@@ -291,10 +327,10 @@ func convertFLFToBit(inputFile string, name string, author string, license strin
 		if !scanner.Scan() {
 			// End of file
 			if len(currentCharLines) > 0 {
-				// Process each line to replace hardblank with space and # with █
+				// Process each line to replace hardblank with space and apply character mappings
 				processedLines := make([]string, len(currentCharLines))
 				for i, line := range currentCharLines {
-					processedLines[i] = processCharacterLine(line, hardblankChar)
+					processedLines[i] = processCharacterLine(line, hardblankChar, charMap)
 				}
 
 				// Calculate the ASCII value for this character position
