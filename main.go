@@ -21,8 +21,8 @@ type CharacterMap map[rune]rune
 
 // processCharacterLine processes a character line by replacing the hardblank character with space and applying character mappings
 func processCharacterLine(line string, hardblankChar string, charMap CharacterMap) string {
-	processedLine := strings.ReplaceAll(line, hardblankChar, " ")  // Replace hardblank with space
-	
+	processedLine := strings.ReplaceAll(line, hardblankChar, " ") // Replace hardblank with space
+
 	// Apply character mappings
 	runes := []rune(processedLine)
 	for i, r := range runes {
@@ -31,7 +31,7 @@ func processCharacterLine(line string, hardblankChar string, charMap CharacterMa
 		}
 	}
 	processedLine = string(runes)
-	
+
 	return processedLine
 }
 
@@ -109,8 +109,8 @@ func main() {
 			// Convert string to runes to properly handle multi-byte UTF-8 characters
 			runes := []rune(mapStr)
 			if len(runes) >= 2 {
-				fromChar := runes[0]  // First rune (character)
-				toChar := runes[1]    // Second rune (character)
+				fromChar := runes[0] // First rune (character)
+				toChar := runes[1]   // Second rune (character)
 				charMap[fromChar] = toChar
 			}
 		}
@@ -208,16 +208,16 @@ func convertFLFToBit(inputFile string, name string, author string, license strin
 	// First, find the line end character by looking at the first non-comment line
 	var lineEndChar string = "@"
 	var firstDataLine string = ""
-	
+
 	// Read the first line after comments to determine the line end character
 	if scanner.Scan() {
 		firstDataLine = scanner.Text()
-		
+
 		// If it's an empty line, continue reading until we find a non-empty line
 		for firstDataLine == "" && scanner.Scan() {
 			firstDataLine = scanner.Text()
 		}
-		
+
 		// Determine the line end character from the last character of the first non-comment line
 		if len(firstDataLine) > 0 {
 			// Trim right whitespace to get the actual last character
@@ -227,7 +227,7 @@ func convertFLFToBit(inputFile string, name string, author string, license strin
 			}
 		}
 	}
-	
+
 	// Create the end-of-character delimiter (two of the line end characters)
 	endOfCharDelimiter := lineEndChar + lineEndChar
 

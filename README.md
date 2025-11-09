@@ -9,12 +9,10 @@ JSON-based (.bit) used by ansifont and
 
 `flf2bit` converts FIGlet font files (FLF) to the JSON-based .bit format that
 can be used with the `bit` terminal font renderer. This allows you to convert
-some FIGlet bitmap style fonts for use the with bit.
+FIGlet fonts for use the with bit.
 
-The initial version of this tool has been tested with the figlet C64-Fonts and
-bdffonts. More fonts may work, but most FIGlet fonts use features not supported
-by `bit`, so results may vary. Additional details on creating the C64 fonts and
-BDF fonts can be found below.
+Most FIGlet fonts should now work with flf2bit. The included Makefile shows how
+to convert many the fonts from the figlet-fonts repository to .bit format.
 
 ## Installation
 
@@ -47,6 +45,8 @@ flf2bit [options] <input.flf> <output.bit>
   "Converted from FLF")
 - `--license <license>`: Set the license (default: "Converted font, check
   original license")
+- `--map-chars <chars>`: Map the first character to the second character during
+  font conversion (can be used multiple times)
 
 ## Examples
 
@@ -60,6 +60,18 @@ Convert with custom metadata:
 
 ```bash
 flf2bit --name "Custom Font" --author "John Doe" --license "MIT" example.flf example.bit
+```
+
+Convert with character mapping (replaces # with █):
+
+```bash
+flf2bit --map-chars "#█" example.flf example.bit
+```
+
+Convert with multiple character mappings (replaces # with █ and . with space):
+
+```bash
+flf2bit --map-chars "#█" --map-chars ". " example.flf example.bit
 ```
 
 ## Adding fonts to `bit`
@@ -77,27 +89,24 @@ cp <path_to>/example.bit fonts/
 go build -o bit ./cmd/bit
 ```
 
-## Creating C64 and BDF Fonts
+## Converting figlet-fonts to .bit format
 
-The included `Makefile` demonstrates how to convert the C64-font and bdffonts
-from the figlet-fonts repository to .bit format using `flf2bit`.
+The included `Makefile` demonstrates how to convert many of the fonts from the
+[figlet-fonts](https://github.com/cmatsuoka/figlet-fonts) repository to .bit
+format using `flf2bit`.
 
 This will download the figlet-fonts repository and the bit repository, convert
 the C64-Fonts and bdffonts, and place them in the `bit/ansifont/fonts`
 directory, and rebuilt bit with the new fonts.
 
 ```bash
-make c64fonts
-make bdffonts
+make
+make all-fonts
 make install
 ```
 
-Note that the Figlet C64-Fonts provided by Figlet where originally extracted
-from Commodore 64 character set file and converted using Commodore2Figlet v1.00
-by David Proper. Some characters are different in the original
-[PETSCII](https://en.wikipedia.org/wiki/PETSCII) than in ASCII, certain
-charactors will be different or missing. Not all fonts include both upper and
-lower case letters, and some fonts transpose the the case.
+Not all fonts include both upper and lower case letters, and some fonts
+transpose the the case.
 
 ## License
 
@@ -110,4 +119,4 @@ GitHub.
 
 ## AI
 
-This project was initially created with assistance from QWEN code.
+This project has been coded with assistance from QWEN code.

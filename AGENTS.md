@@ -25,6 +25,27 @@ flf2bit [options] <input.flf> <output.bit>
 - `--author`: Set the author
 - `--license`: Set the license
 
+### flf file format
+
+Example first line of a .flf file:
+```
+flf2a$ 3 3 5 -1 23
+```
+
+Explanation of first line:
+flf2 - "magic number" for file identification
+a    - should always be `a', for now
+$    - the "hardblank" -- prints as a blank, but can't be smushed
+3    - height of a character
+3    - height of a character, not including descenders
+5    - max line length (excluding comment lines) + a fudge factor
+-1   - default smushmode for this font
+23   - number of comment lines
+
+The hardblank character is `$` in this case. This means that wherever `$` appears in the character definitions, it should be treated as a space when rendering text.
+Different FIGlet fonts may use different hardblank characters, so the converter must correctly identify and handle this character when processing the font data.
+
+
 ### Bit Terminal ANSI Logo Designer
 The `bit` project https://github.com/superstarryeyes/bit is a comprehensive terminal ANSI logo designer and font library built in Go. It serves as the main application that consumes the .bit font files created by the flf2bit tool.
 
