@@ -248,17 +248,19 @@ func convertFLFToBit(inputFile string, name string, author string, license strin
 	for {
 		line := currentLine
 
-		// If line contains the end-of-character delimiter, it's the end of a character
-		if strings.Contains(line, endOfCharDelimiter) {
-			parts := strings.Split(line, endOfCharDelimiter)
-
-			// Process the first part (end of current character)
-			if parts[0] != "" {
-				charParts := strings.Split(parts[0], lineEndChar)
-				for _, part := range charParts {
-					processedPart := processCharacterLine(part, hardblankChar, charMap)
-					currentCharLines = append(currentCharLines, processedPart)
-				}
+		// Check if line ends with the end-of-character delimiter (after trimming whitespace)
+		trimmedLine := strings.TrimRight(line, " \t\r\n")
+		if len(trimmedLine) >= 2 && strings.HasSuffix(trimmedLine, endOfCharDelimiter) {
+			// Remove the end-of-character delimiter from the end
+			charData := strings.TrimSuffix(trimmedLine, endOfCharDelimiter)
+			
+			// Process the character data
+			// Split the data and process each part
+			parts := strings.Split(charData, lineEndChar)
+			for _, part := range parts {
+				// Process all parts, including empty ones to preserve spacing
+				processedPart := processCharacterLine(part, hardblankChar, charMap)
+				currentCharLines = append(currentCharLines, processedPart)
 			}
 
 			// Add completed character
@@ -281,25 +283,13 @@ func convertFLFToBit(inputFile string, name string, author string, license strin
 				currentCharLines = []string{}
 				inCharacter = false
 			}
-
-			// Process the second part if it exists (start of next character)
-			if len(parts) > 1 && parts[1] != "" {
-				nextParts := strings.Split(parts[1], lineEndChar)
-				for _, part := range nextParts {
-					processedPart := processCharacterLine(part, hardblankChar, charMap)
-					currentCharLines = append(currentCharLines, processedPart)
-					inCharacter = true
-				}
-			}
-		} else if strings.HasSuffix(line, lineEndChar) {
+		} else if strings.HasSuffix(trimmedLine, lineEndChar) {
 			// This is a line of the current character
-			// Split by the line end character to get the actual character data
-			parts := strings.Split(line, lineEndChar)
-			// The last element after splitting is usually empty, so we process all but the last
-			for i := 0; i < len(parts)-1; i++ {
-				processedPart := processCharacterLine(parts[i], hardblankChar, charMap)
-				currentCharLines = append(currentCharLines, processedPart)
-			}
+			// Remove the line end character and add the line to current character
+			charLine := strings.TrimSuffix(trimmedLine, lineEndChar)
+			// Process all lines, including empty ones to preserve spacing
+			processedLine := processCharacterLine(charLine, hardblankChar, charMap)
+			currentCharLines = append(currentCharLines, processedLine)
 			inCharacter = true
 		} else if line == "" {
 			// Empty line after character data may indicate end of character
