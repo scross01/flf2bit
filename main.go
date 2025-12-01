@@ -19,20 +19,23 @@ type FontData struct {
 // CharacterMap represents a mapping from one character to another
 type CharacterMap map[rune]rune
 
-// processCharacterLine processes a character line by replacing the hardblank character with space and applying character mappings
-func processCharacterLine(line string, hardblankChar string, charMap CharacterMap) string {
-	processedLine := strings.ReplaceAll(line, hardblankChar, " ") // Replace hardblank with space
+// processCharacter processes a complete character's lines applying hardblank replacement and character mappings
+func processCharacter(charLines []string, hardblankChar string, charMap CharacterMap) []string {
+	processedLines := make([]string, len(charLines))
+	for i, line := range charLines {
+		// Process the line by replacing hardblank with space and applying character mappings
+		processedLine := strings.ReplaceAll(line, hardblankChar, " ")
 
-	// Apply character mappings
-	runes := []rune(processedLine)
-	for i, r := range runes {
-		if replacement, exists := charMap[r]; exists {
-			runes[i] = replacement
+		// Apply character mappings
+		runes := []rune(processedLine)
+		for j, r := range runes {
+			if replacement, exists := charMap[r]; exists {
+				runes[j] = replacement
+			}
 		}
+		processedLines[i] = string(runes)
 	}
-	processedLine = string(runes)
-
-	return processedLine
+	return processedLines
 }
 
 func main() {
@@ -43,7 +46,9 @@ func main() {
 		fmt.Println("  --author <author> Set the author (default: extracted from FLF)")
 		fmt.Println("  --license <license> Set the license (default: 'Converted font, check original license')")
 		fmt.Println("  --map-chars <chars> Map first character to second character (can be used multiple times)")
+		fmt.Println("  --debug [chars]   Enable debug output for all characters or specific characters")
 		fmt.Println("Example: flf2bit --name \"Custom Font\" --author \"John Doe\" --map-chars \"#█\" example.flf example.bit")
+		fmt.Println("Example: flf2bit --debug A B C example.flf example.bit")
 		os.Exit(1)
 	}
 
@@ -51,6 +56,8 @@ func main() {
 	name := ""
 	author := ""
 	license := ""
+	debugEnabled := false
+	debugChars := make(map[rune]bool)
 	charMaps := []string{} // Store character mapping pairs
 	args := os.Args[1:]
 	var inputFile, outputFile string
@@ -89,6 +96,23 @@ func main() {
 				fmt.Println("Error: --map-chars requires a value")
 				os.Exit(1)
 			}
+		} else if arg == "--debug" {
+			debugEnabled = true
+			// Check if there are more arguments after --debug
+			i++
+			for i < len(args) && !strings.HasPrefix(args[i], "--") {
+				// Add each character to the debug set
+				if len(args[i]) == 1 {
+					debugChars[rune(args[i][0])] = true
+				} else {
+					// If it's a multi-character string, add each character
+					for _, char := range args[i] {
+						debugChars[char] = true
+					}
+				}
+				i++
+			}
+			i-- // Adjust index since the loop will increment it
 		} else if inputFile == "" {
 			inputFile = arg
 		} else if outputFile == "" {
@@ -116,7 +140,7 @@ func main() {
 		}
 	}
 
-	font, err := convertFLFToBit(inputFile, name, author, license, charMap)
+	font, err := convertFLFToBit(inputFile, name, author, license, charMap, debugEnabled, debugChars)
 	if err != nil {
 		fmt.Printf("Error converting font: %v\n", err)
 		os.Exit(1)
@@ -131,7 +155,7 @@ func main() {
 	fmt.Printf("Successfully converted %s to %s\n", inputFile, outputFile)
 }
 
-func convertFLFToBit(inputFile string, name string, author string, license string, charMap CharacterMap) (*FontData, error) {
+func convertFLFToBit(inputFile string, name string, author string, license string, charMap CharacterMap, debugEnabled bool, debugChars map[rune]bool) (*FontData, error) {
 	file, err := os.Open(inputFile)
 	if err != nil {
 		return nil, err
@@ -205,11 +229,10 @@ func convertFLFToBit(inputFile string, name string, author string, license strin
 		fontLicense = "Converted font, check original license"
 	}
 
-	// First, find the line end character by looking at the first non-comment line
-	var lineEndChar string = "@"
+	// Read the first line after comments
 	var firstDataLine string = ""
 
-	// Read the first line after comments to determine the line end character
+	// Read the first line after comments
 	if scanner.Scan() {
 		firstDataLine = scanner.Text()
 
@@ -218,18 +241,7 @@ func convertFLFToBit(inputFile string, name string, author string, license strin
 			firstDataLine = scanner.Text()
 		}
 
-		// Determine the line end character from the last character of the first non-comment line
-		if len(firstDataLine) > 0 {
-			// Trim right whitespace to get the actual last character
-			trimmedLine := strings.TrimRight(firstDataLine, " \t\r\n")
-			if len(trimmedLine) > 0 {
-				lineEndChar = string(trimmedLine[len(trimmedLine)-1])
-			}
-		}
 	}
-
-	// Create the end-of-character delimiter (two of the line end characters)
-	endOfCharDelimiter := lineEndChar + lineEndChar
 
 	// Process characters
 	characters := make(map[string][]string)
@@ -241,98 +253,104 @@ func convertFLFToBit(inputFile string, name string, author string, license strin
 	// Process characters until EOF
 	// Count all characters in file order, then map to appropriate ASCII codes
 	charIndex := 0 // Start at 0, will adjust to ASCII later
-	inCharacter := false
-	var currentCharLines []string
 
-	// Process the first character line
+	// Process characters one at a time
 	for {
-		line := currentLine
-
-		// Check if line ends with the end-of-character delimiter (after trimming whitespace)
-		trimmedLine := strings.TrimRight(line, " \t\r\n")
-		if len(trimmedLine) >= 2 && strings.HasSuffix(trimmedLine, endOfCharDelimiter) {
-			// Remove the end-of-character delimiter from the end
-			charData := strings.TrimSuffix(trimmedLine, endOfCharDelimiter)
-			
-			// Process the character data
-			// Split the data and process each part
-			parts := strings.Split(charData, lineEndChar)
-			for _, part := range parts {
-				// Process all parts, including empty ones to preserve spacing
-				processedPart := processCharacterLine(part, hardblankChar, charMap)
-				currentCharLines = append(currentCharLines, processedPart)
+		// 1. Determine marker character for current character block from first line of character
+		if currentLine == "" {
+			// Skip empty lines
+			if !scanner.Scan() {
+				break // End of file
 			}
-
-			// Add completed character
-			if len(currentCharLines) > 0 {
-				// Process each line to replace hardblank with space and apply character mappings
-				processedLines := make([]string, len(currentCharLines))
-				for i, line := range currentCharLines {
-					processedLines[i] = processCharacterLine(line, hardblankChar, charMap)
-				}
-
-				// Calculate the ASCII value for this character position
-				asciiValue := charIndex + 32
-
-				// Only add characters in the standard ASCII range (space to tilde, 32-126)
-				if asciiValue >= 32 && asciiValue <= 126 {
-					char := string(rune(asciiValue))
-					characters[char] = processedLines
-				}
-				charIndex++
-				currentCharLines = []string{}
-				inCharacter = false
-			}
-		} else if strings.HasSuffix(trimmedLine, lineEndChar) {
-			// This is a line of the current character
-			// Remove the line end character and add the line to current character
-			charLine := strings.TrimSuffix(trimmedLine, lineEndChar)
-			// Process all lines, including empty ones to preserve spacing
-			processedLine := processCharacterLine(charLine, hardblankChar, charMap)
-			currentCharLines = append(currentCharLines, processedLine)
-			inCharacter = true
-		} else if line == "" {
-			// Empty line after character data may indicate end of character
-			if inCharacter && len(currentCharLines) > 0 {
-				processedLines := make([]string, len(currentCharLines))
-				for i, line := range currentCharLines {
-					processedLines[i] = processCharacterLine(line, hardblankChar, charMap)
-				}
-
-				// Calculate the ASCII value for this character position
-				asciiValue := charIndex + 32
-
-				// Only add characters in the standard ASCII range (space to tilde, 32-126)
-				if asciiValue >= 32 && asciiValue <= 126 {
-					char := string(rune(asciiValue))
-					characters[char] = processedLines
-				}
-				charIndex++
-				currentCharLines = []string{}
-				inCharacter = false
-			}
+			currentLine = scanner.Text()
+			continue
 		}
 
-		// Read next line
-		if !scanner.Scan() {
-			// End of file
-			if len(currentCharLines) > 0 {
-				// Process each line to replace hardblank with space and apply character mappings
-				processedLines := make([]string, len(currentCharLines))
-				for i, line := range currentCharLines {
-					processedLines[i] = processCharacterLine(line, hardblankChar, charMap)
-				}
+		// Determine the line end character from the last character of the first line
+		trimmedLine := strings.TrimRight(currentLine, " \t\r\n")
+		var lineEndChar string = "@"
+		if len(trimmedLine) > 0 {
+			lineEndChar = string(trimmedLine[len(trimmedLine)-1])
+		}
 
-				// Calculate the ASCII value for this character position
-				asciiValue := charIndex + 32
+		// 2. Read ahead to the end of character marker and collect all lines
+		var charLines []string
+		for {
+			trimmedLine := strings.TrimRight(currentLine, " \t\r\n")
 
-				// Only add the last character if it's in the standard ASCII range (space to tilde, 32-126)
-				if asciiValue >= 32 && asciiValue <= 126 {
-					// Add the last character if any data remains
-					char := string(rune(asciiValue))
-					characters[char] = processedLines
+			// Check if this is the end of the character (two consecutive end-of-line markers)
+			endOfCharDelimiter := lineEndChar + lineEndChar
+			if len(trimmedLine) >= 2 && strings.HasSuffix(trimmedLine, endOfCharDelimiter) {
+				// Remove the end-of-character delimiter from the end
+				charData := strings.TrimSuffix(trimmedLine, endOfCharDelimiter)
+
+				// Split the data and collect each part
+				parts := strings.Split(charData, lineEndChar)
+				for _, part := range parts {
+					charLines = append(charLines, part)
 				}
+				break
+			} else if strings.HasSuffix(trimmedLine, lineEndChar) {
+				// This is a line of the current character
+				// Remove the line end character and add the line to current character
+				charLine := strings.TrimSuffix(trimmedLine, lineEndChar)
+				charLines = append(charLines, charLine)
+			} else if currentLine == "" {
+				// Empty line after character data may indicate end of character
+				break
 			}
+
+			// Read next line
+			if !scanner.Scan() {
+				// End of file
+				break
+			}
+
+			currentLine = scanner.Text()
+		}
+
+		// 3. Process the block of character data to convert
+		if len(charLines) > 0 {
+			// Process the character lines with hardblank replacement and character mappings
+			processedLines := processCharacter(charLines, hardblankChar, charMap)
+
+			// Calculate the ASCII value for this character position
+			asciiValue := charIndex + 32
+
+			// 4. Update the `characters` with the current character as each character is processed
+			// Only add characters in the standard ASCII range (space to tilde, 32-126)
+			if asciiValue >= 32 && asciiValue <= 126 {
+				char := string(rune(asciiValue))
+
+				// Debug output - only show if debug is enabled
+				if debugEnabled {
+					// Check if we should show debug for this specific character
+					showDebug := len(debugChars) == 0 // If no specific chars specified, show all
+					if len(debugChars) > 0 {
+						showDebug = debugChars[rune(asciiValue)] // Only show if this char is in the list
+					}
+
+					if showDebug {
+						fmt.Printf("Processing character '%c' (ASCII %d)\n", asciiValue, asciiValue)
+						fmt.Println("FLF input:")
+						for _, line := range charLines {
+							fmt.Printf("  %q\n", line)
+						}
+						fmt.Println("BIT output:")
+						for _, line := range processedLines {
+							fmt.Printf("  %q\n", line)
+						}
+						fmt.Println()
+					}
+				}
+
+				characters[char] = processedLines
+			}
+			charIndex++
+		}
+
+		// 5. Repeat for next character until end of file
+		if !scanner.Scan() {
 			break
 		}
 
