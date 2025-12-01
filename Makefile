@@ -7,7 +7,7 @@ BDF_FONTS = $(FIGLET_FONTS_DIR)/bdffonts/*.flf
 
 JAVE_FONTS = $(FIGLET_FONTS_DIR)/jave/*.flf
 FIGLET_FONTS = $(FIGLET_FONTS_DIR)/ours/*.flf
-TOILET_FONTS = $(FIGLET_FONTS_DIR)/toilet/*.flf
+TOILET_FONTS = $(FIGLET_FONTS_DIR)/toilet/*.tlf
 CONTRIBUTED_FONTS = $(FIGLET_FONTS_DIR)/contributed/*.flf
 MSDOS_FONTS = $(FIGLET_FONTS_DIR)/ms-dos/*.flf
 
@@ -22,7 +22,7 @@ $(BIT_DIR):
 $(FIGLET_FONTS_DIR):
 	git clone https://github.com/cmatsuoka/figlet-fonts.git
 
-all-fonts: bdffonts c64fonts contributed jave msdos ours
+all-fonts: bdffonts c64fonts contributed jave msdos ours toilet
 
 # convert the Figlet figlet-fonts/bdffonts
 bdffonts: flf2bit figlet-fonts
@@ -67,11 +67,10 @@ ours: flf2bit figlet-fonts
 	done
 
 # convert the figlet-fonts/toilet fonts
-# TODO tlf font format not supported yet
 toilet: flf2bit figlet-fonts
 	mkdir -p fonts
 	for font in $(TOILET_FONTS); do \
-		./flf2bit --name "Toilet $$(basename "$${font%.flf}")" --author "Converted from figlet-fonts with flf2bit by Stephen Cross." --license "see https://github.com/cmatsuoka/figlet-fonts/blob/master/README" $$font fonts/toilet-$$(basename "$${font%.flf}").bit; \
+		./flf2bit --name "Toilet $$(basename "$${font%.tlf}")" --author "Converted from figlet-fonts with flf2bit by Stephen Cross." --license "see https://github.com/cmatsuoka/figlet-fonts/blob/master/README" $$font fonts/toilet-$$(basename "$${font%.tlf}").bit; \
 	done
 
 # copy the fonts to the bit ansifonts fonts directory and rebuild bit

@@ -1,15 +1,14 @@
 # flf2bit
 
 A command-line tool for converting
-[FIGlet font files](https://github.com/cmatsuoka/figlet-fonts) (.flf) to a
-JSON-based (.bit) used by ansifont and
-[`bit`](<(https://github.com/superstarryeyes/bit)>) project.
+[FIGlet font files](https://github.com/cmatsuoka/figlet-fonts) (.flf) and [TOIlet font files]() (.tlf) to a
+JSON-based (.bit) fonts used by [`bit`](<(https://github.com/superstarryeyes/bit)>) project.
 
 ## Description
 
-`flf2bit` converts FIGlet font files (FLF) to the JSON-based .bit format that
+`flf2bit` converts FIGlet and TOIlet font file to the JSON-based .bit format that
 can be used with the `bit` terminal font renderer. This allows you to convert
-FIGlet fonts for use the with bit.
+FIGlet/TOIlet fonts for use the with bit.
 
 Most FIGlet fonts should now work with flf2bit. The included Makefile shows how
 to convert many the fonts from the figlet-fonts repository to .bit format.
@@ -21,7 +20,7 @@ to convert many the fonts from the figlet-fonts repository to .bit format.
 ```bash
 git clone https://github.com/scross01/flf2bit
 cd flf2bit
-go install
+go install .
 ```
 
 Or install directly using Go:
@@ -47,6 +46,7 @@ flf2bit [options] <input.flf> <output.bit>
   original license")
 - `--map-chars <chars>`: Map the first character to the second character during
   font conversion (can be used multiple times)
+- `--debug [chars]`:  Enable debug output for all characters or specific characters
 
 ## Examples
 
@@ -55,6 +55,13 @@ Convert a FIGlet font file to the .bit format:
 ```bash
 flf2bit example.flf example.bit
 ```
+
+Convert a TOIlet font file to the .bit format:
+
+```bash
+flf2bit example.tlf example.bit
+```
+
 
 Convert with custom metadata:
 
