@@ -254,8 +254,29 @@ func convertFLFToBit(inputFile string, name string, author string, license strin
 	// Count all characters in file order, then map to appropriate ASCII codes
 	charIndex := 0 // Start at 0, will adjust to ASCII later
 
+	// Determine the line end character from the first line after comments
+	// This needs to be done once at the start
+	trimmedFirstLine := strings.TrimRight(firstDataLine, " \t\r\n")
+	var lineEndChar string = "@"
+	if len(trimmedFirstLine) > 0 {
+		lineEndChar = string(trimmedFirstLine[len(trimmedFirstLine)-1])
+	}
+
 	// Process characters one at a time
 	for {
+		// Skip lines that consist only of the delimiter character(s) - these are separators
+		// not actual character data
+		trimmedLine := strings.TrimRight(currentLine, " \t\r\n")
+		isOnlyDelimiter := len(trimmedLine) > 0 && strings.Trim(trimmedLine, lineEndChar) == ""
+		if isOnlyDelimiter {
+			// Skip this line and read the next one
+			if !scanner.Scan() {
+				break
+			}
+			currentLine = scanner.Text()
+			continue
+		}
+
 		// 1. Determine marker character for current character block from first line of character
 		if currentLine == "" {
 			// Skip empty lines
@@ -264,13 +285,6 @@ func convertFLFToBit(inputFile string, name string, author string, license strin
 			}
 			currentLine = scanner.Text()
 			continue
-		}
-
-		// Determine the line end character from the last character of the first line
-		trimmedLine := strings.TrimRight(currentLine, " \t\r\n")
-		var lineEndChar string = "@"
-		if len(trimmedLine) > 0 {
-			lineEndChar = string(trimmedLine[len(trimmedLine)-1])
 		}
 
 		// 2. Read ahead to the end of character marker and collect all lines
