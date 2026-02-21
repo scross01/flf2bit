@@ -140,7 +140,26 @@ func main() {
 		}
 	}
 
-	font, err := convertFLFToBit(inputFile, name, author, license, charMap, debugEnabled, debugChars)
+	// Read header to get character height
+	file, err := os.Open(inputFile)
+	if err != nil {
+		fmt.Printf("Error opening file: %v\n", err)
+		os.Exit(1)
+	}
+	scanner := bufio.NewScanner(file)
+	if !scanner.Scan() {
+		fmt.Printf("Error reading header: %v\n", err)
+		os.Exit(1)
+	}
+	header := scanner.Text()
+	parts := strings.Split(header, " ")
+	charHeight := 0
+	if len(parts) >= 2 {
+		fmt.Sscanf(parts[1], "%d", &charHeight)
+	}
+	file.Close()
+
+	font, err := convertFLFToBit(inputFile, name, author, license, charMap, debugEnabled, debugChars, charHeight)
 	if err != nil {
 		fmt.Printf("Error converting font: %v\n", err)
 		os.Exit(1)
@@ -155,7 +174,7 @@ func main() {
 	fmt.Printf("Successfully converted %s to %s\n", inputFile, outputFile)
 }
 
-func convertFLFToBit(inputFile string, name string, author string, license string, charMap CharacterMap, debugEnabled bool, debugChars map[rune]bool) (*FontData, error) {
+func convertFLFToBit(inputFile string, name string, author string, license string, charMap CharacterMap, debugEnabled bool, debugChars map[rune]bool, charHeight int) (*FontData, error) {
 	file, err := os.Open(inputFile)
 	if err != nil {
 		return nil, err
@@ -297,38 +316,51 @@ func convertFLFToBit(inputFile string, name string, author string, license strin
 
 		// 2. Read ahead to the end of character marker and collect all lines
 		var charLines []string
-		for {
+
+		// For fonts with height=1, each line is a complete character
+		// So we just process the current line and don't look for double terminator
+		if charHeight == 1 {
 			trimmedLine := strings.TrimRight(currentLine, " \t\r\n")
-
-			// Check if this is the end of the character (two consecutive end-of-line markers)
-			endOfCharDelimiter := lineEndChar + lineEndChar
-			if len(trimmedLine) >= 2 && strings.HasSuffix(trimmedLine, endOfCharDelimiter) {
-				// Remove the end-of-character delimiter from the end
-				charData := strings.TrimSuffix(trimmedLine, endOfCharDelimiter)
-
-				// Split the data and collect each part
-				parts := strings.Split(charData, lineEndChar)
-				for _, part := range parts {
-					charLines = append(charLines, part)
-				}
-				break
-			} else if strings.HasSuffix(trimmedLine, lineEndChar) {
-				// This is a line of the current character
-				// Remove the line end character and add the line to current character
+			if len(trimmedLine) > 0 {
+				lineEndChar := string(trimmedLine[len(trimmedLine)-1])
 				charLine := strings.TrimSuffix(trimmedLine, lineEndChar)
 				charLines = append(charLines, charLine)
-			} else if currentLine == "" {
-				// Empty line after character data may indicate end of character
-				break
 			}
+		} else {
+			// For fonts with height>1, look for double terminator to mark end of character
+			for {
+				trimmedLine := strings.TrimRight(currentLine, " \t\r\n")
 
-			// Read next line
-			if !scanner.Scan() {
-				// End of file
-				break
+				// Check if this is the end of the character (two consecutive end-of-line markers)
+				endOfCharDelimiter := lineEndChar + lineEndChar
+				if len(trimmedLine) >= 2 && strings.HasSuffix(trimmedLine, endOfCharDelimiter) {
+					// Remove the end-of-character delimiter from the end
+					charData := strings.TrimSuffix(trimmedLine, endOfCharDelimiter)
+
+					// Split the data and collect each part
+					parts := strings.Split(charData, lineEndChar)
+					for _, part := range parts {
+						charLines = append(charLines, part)
+					}
+					break
+				} else if strings.HasSuffix(trimmedLine, lineEndChar) {
+					// This is a line of the current character
+					// Remove the line end character and add the line to current character
+					charLine := strings.TrimSuffix(trimmedLine, lineEndChar)
+					charLines = append(charLines, charLine)
+				} else if currentLine == "" {
+					// Empty line after character data may indicate end of character
+					break
+				}
+
+				// Read next line
+				if !scanner.Scan() {
+					// End of file
+					break
+				}
+
+				currentLine = scanner.Text()
 			}
-
-			currentLine = scanner.Text()
 		}
 
 		// 3. Process the block of character data to convert
