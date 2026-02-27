@@ -38,6 +38,111 @@ func processCharacter(charLines []string, hardblankChar string, charMap Characte
 	return processedLines
 }
 
+// stripCharacterPadding removes padding from character lines according to the rules:
+// - Removes only trailing empty rows (preserves leading and middle empty rows)
+// - Removes only leading and trailing empty columns (preserves middle empty columns)
+func stripCharacterPadding(charLines []string) []string {
+	if len(charLines) == 0 {
+		return charLines
+	}
+
+	// 1. Remove trailing empty rows
+	lastNonEmptyRow := len(charLines) - 1
+	for lastNonEmptyRow >= 0 && strings.TrimSpace(charLines[lastNonEmptyRow]) == "" {
+		lastNonEmptyRow--
+	}
+	
+	// If all rows are empty, return a single empty row
+	if lastNonEmptyRow < 0 {
+		return []string{""}
+	}
+	
+	// Keep rows up to the last non-empty row
+	strippedRows := charLines[:lastNonEmptyRow+1]
+	
+	// 2. Find the leftmost and rightmost non-empty column across all rows
+	minLeftCol := -1
+	maxRightCol := -1
+	
+	for _, row := range strippedRows {
+		// Convert string to rune slice to properly handle multi-byte characters
+		runes := []rune(row)
+		
+		// Find leftmost non-space character in this row
+		leftCol := -1
+		for i, ch := range runes {
+			if !strings.ContainsRune(" \t", ch) {
+				leftCol = i
+				break
+			}
+		}
+		
+		// Find rightmost non-space character in this row
+		rightCol := -1
+		for i := len(runes) - 1; i >= 0; i-- {
+			if !strings.ContainsRune(" \t", runes[i]) {
+				rightCol = i
+				break
+			}
+		}
+		
+		// Update global bounds
+		if leftCol != -1 {
+			if minLeftCol == -1 || leftCol < minLeftCol {
+				minLeftCol = leftCol
+			}
+		}
+		if rightCol != -1 {
+			if maxRightCol == -1 || rightCol > maxRightCol {
+				maxRightCol = rightCol
+			}
+		}
+	}
+	
+	// If all rows are empty (no non-space characters found), return as is
+	if minLeftCol == -1 || maxRightCol == -1 {
+		return strippedRows
+	}
+	
+	// 3. Strip leading and trailing empty columns from each row and pad to uniform width
+	result := make([]string, len(strippedRows))
+	targetWidth := maxRightCol - minLeftCol + 1
+	
+	for i, row := range strippedRows {
+		// Convert string to rune slice to properly handle multi-byte characters
+		runes := []rune(row)
+		
+		// Extract the content between minLeftCol and maxRightCol
+		var contentRunes []rune
+		if len(runes) <= maxRightCol {
+			// Row is shorter than expected, pad with spaces before extracting
+			paddedRunes := make([]rune, maxRightCol+1)
+			copy(paddedRunes, runes)
+			for j := len(runes); j < maxRightCol+1; j++ {
+				paddedRunes[j] = ' '
+			}
+			contentRunes = paddedRunes[minLeftCol : maxRightCol+1]
+		} else {
+			// Row is long enough, just extract the substring
+			contentRunes = runes[minLeftCol : maxRightCol+1]
+		}
+		
+		// Pad to target width if needed
+		if len(contentRunes) < targetWidth {
+			paddedContent := make([]rune, targetWidth)
+			copy(paddedContent, contentRunes)
+			for j := len(contentRunes); j < targetWidth; j++ {
+				paddedContent[j] = ' '
+			}
+			contentRunes = paddedContent
+		}
+		
+		result[i] = string(contentRunes)
+	}
+	
+	return result
+}
+
 func main() {
 	if len(os.Args) < 3 {
 		fmt.Println("Usage: flf2bit [options] <input.flf> <output.bit>")
@@ -47,8 +152,10 @@ func main() {
 		fmt.Println("  --license <license> Set the license (default: 'Converted font, check original license')")
 		fmt.Println("  --map-chars <chars> Map first character to second character (can be used multiple times)")
 		fmt.Println("  --debug [chars]   Enable debug output for all characters or specific characters")
+		fmt.Println("  --no-strip        Preserve padding around characters (default is to strip)")
 		fmt.Println("Example: flf2bit --name \"Custom Font\" --author \"John Doe\" --map-chars \"#█\" example.flf example.bit")
 		fmt.Println("Example: flf2bit --debug A B C example.flf example.bit")
+		fmt.Println("Example: flf2bit --no-strip example.flf example.bit")
 		os.Exit(1)
 	}
 
@@ -59,6 +166,7 @@ func main() {
 	debugEnabled := false
 	debugChars := make(map[rune]bool)
 	charMaps := []string{} // Store character mapping pairs
+	stripPadding := true  // Flag to strip padding from characters
 	args := os.Args[1:]
 	var inputFile, outputFile string
 
@@ -96,6 +204,8 @@ func main() {
 				fmt.Println("Error: --map-chars requires a value")
 				os.Exit(1)
 			}
+		} else if arg == "--no-strip" {
+			stripPadding = false
 		} else if arg == "--debug" {
 			debugEnabled = true
 			// Check if there are more arguments after --debug
@@ -159,7 +269,7 @@ func main() {
 	}
 	file.Close()
 
-	font, err := convertFLFToBit(inputFile, name, author, license, charMap, debugEnabled, debugChars, charHeight)
+	font, err := convertFLFToBit(inputFile, name, author, license, charMap, debugEnabled, debugChars, charHeight, stripPadding)
 	if err != nil {
 		fmt.Printf("Error converting font: %v\n", err)
 		os.Exit(1)
@@ -174,7 +284,7 @@ func main() {
 	fmt.Printf("Successfully converted %s to %s\n", inputFile, outputFile)
 }
 
-func convertFLFToBit(inputFile string, name string, author string, license string, charMap CharacterMap, debugEnabled bool, debugChars map[rune]bool, charHeight int) (*FontData, error) {
+func convertFLFToBit(inputFile string, name string, author string, license string, charMap CharacterMap, debugEnabled bool, debugChars map[rune]bool, charHeight int, stripPadding bool) (*FontData, error) {
 	file, err := os.Open(inputFile)
 	if err != nil {
 		return nil, err
@@ -367,6 +477,11 @@ func convertFLFToBit(inputFile string, name string, author string, license strin
 		if len(charLines) > 0 {
 			// Process the character lines with hardblank replacement and character mappings
 			processedLines := processCharacter(charLines, hardblankChar, charMap)
+			
+			// Apply strip padding if requested
+			if stripPadding {
+				processedLines = stripCharacterPadding(processedLines)
+			}
 
 			// Calculate the ASCII value for this character position
 			asciiValue := charIndex + 32
